@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grid Options</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        #options-page, #task-page, #result-page {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #options-page {
+            flex-direction: column;
+        }
+        #task-page {
+            flex-direction: column;
+        }
+        table {
+            border-collapse: collapse;
+        }
+        td {
+            border: 1px solid black;
+            width: 150px;
+            height: 150px;
+            text-align: center;
+            cursor: pointer;
+        }
+        #task-page h1 {
+            display: none; /* Hide the title */
+        }
+        #task-page table {
+            margin: 0 auto; /* Center the grid */
+        }
+        #task-page td {
+            font-size: 30px; /* Increase the font size of numbers */
+            font-weight: bold; /* Make the number font bold */
+            
+        }
+        #options-page button,
+        #result-page button {
+                 font-size: 30px;
+                 padding: 10px 30px;
+                }
+    </style>
+</head>
+<body>
+    <div id="options-page">
+        <h1>Grid Options</h1>
+        <label for="grid-size">Select Grid Size:</label>
+        <select id="grid-size">
+            <option value="3">3x3</option>
+            <option value="4">4x4</option>
+            <option value="5">5x5</option>
+            <option value="6">6x6</option>
+            <option value="7">7x7</option>
+        </select>
+        <br><br>
+        <label for="number-type">Select Number Type:</label>
+        <select id="number-type">
+            <option value="natural">Natural Numbers (1, 2, 3...)</option>
+            <option value="even">Even Numbers (2, 4, 6...)</option>
+            <option value="odd">Odd Numbers (1, 3, 5...)</option>
+            <option value="custom">Custom Numbers (Starting from <input type="number" id="custom-start" min="1" value="1">, Every <input type="number" id="custom-step" min="1" value="3"> numbers)</option>
+        </select>
+        <br><br>
+        <label for="task-type">Select Task Type:</label>
+        <select id="task-type">
+            <option value="ascending">Ascending Order</option>
+            <option value="descending">Descending Order</option>
+            <option value="multivariate">Multivariate Order</option>
+        </select>
+        <br><br>
+        <label for="color-correct-keys">Color Correct Keys:</label>
+        <input type="checkbox" id="color-correct-keys">
+        <br><br>
+        <label for="user-name">User Name:</label>
+        <input type="text" id="user-name">
+        <br><br>
+        <button id="start-btn">Start</button>
+    </div>
+
+    <div id="task-page" style="display: none;">
+        <h1>Task Page</h1>
+        <table id="grid"></table>
+    </div>
+
+    <div id="result-page" style="display: none;">
+        <h1>Result Page</h1>
+        <p id="time-taken"></p>
+        <p id="inter-key-intervals"></p>
+        <p id="errors"></p>
+        <button id="download-btn">Download Results</button>
+        <button id="reset-btn">Reset</button>
+    </div>
+
+    <script>
+        var gridSize;
+        var numberType;
+        var taskType;
+        var colorCorrectKeys;
+        var numbers = [];
+        var correctSequence = [];
+        var userSequence = [];
+        var startTime;
+        var interKeyIntervals = [];
+        var errors = 0;
+        var completed = false;
+
+        $("#start-btn").on("click", function() {
+            gridSize = parseInt($("#grid-size").val());
+            numberType = $("#number-type").val();
+            taskType = $("#task-type").val();
+            colorCorrectKeys = $("#color-correct-keys").prop("checked");
+
+            generateNumbers();
+            generateCorrectSequence();
+            displayTaskPage();
+        });
+        $("#reset-btn").on("click", function() {
+            resetModule();
+        });
+
+        function generateNumbers() {
+            if (numberType === "natural") {
+                numbers = Array.from({length: gridSize * gridSize}, (_, i) => i + 1);
+            } else if (numberType === "even") {
+                numbers = Array.from({length: gridSize * gridSize}, (_, i) => (i + 1) * 2);
+            } else if (numberType === "odd") {
+                numbers = Array.from({length: gridSize * gridSize}, (_, i) => i * 2 + 1);
+            } else if (numberType === "custom") {
+                var customStart = parseInt($("#custom-start").val());
+                var customStep = parseInt($("#custom-step").val());
+                numbers = Array.from({length: gridSize * gridSize}, (_, i) => (i * customStep) + customStart);
+            }
+
+            shuffleNumbers();
+        }
+
+        function shuffleNumbers() {
+            for (var i = numbers.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+            }
+        }
+
+        function generateCorrectSequence() {
+            if (taskType === "ascending") {
+                correctSequence = numbers.slice().sort(function(a, b) { return a - b; });
+            } else if (taskType === "descending") {
+                correctSequence = numbers.slice().sort(function(a, b) { return b - a; });
+            } else if (taskType === "multivariate") {
+                correctSequence = numbers.slice();
+            }
+        }
+
+        function displayTaskPage() {
+            $("#options-page").hide();
+            $("#task-page").show();
+
+            var gridTable = $("#grid");
+            gridTable.empty();
+
+            var cellSize = Math.min(200, Math.floor(window.innerHeight / gridSize) - 10);
+
+            for (var i = 0; i < gridSize; i++) {
+                var row = $("<tr></tr>");
+                for (var j = 0; j < gridSize; j++) {
+                    var cell = $("<td></td>").text(numbers[i * gridSize + j]).css("width", cellSize + "px").css("height", cellSize + "px");
+                    row.append(cell);
+                }
+                gridTable.append(row);
+            }
+
+            startTime = new Date();
+
+            $("#grid").on("click", "td", function() {
+                if (!completed) {
+                    var selectedNumber = parseInt($(this).text());
+                    userSequence.push(selectedNumber);
+
+                    if (selectedNumber === correctSequence[userSequence.length - 1]) {
+                        if (colorCorrectKeys) {
+                            $(this).css("background-color", "green");
+                        }
+
+                        if (userSequence.length === correctSequence.length) {
+                            completed = true;
+                            var endTime = new Date();
+                            var timeTaken = (endTime - startTime) / 1000;
+
+                            $("#task-page").hide();
+                            $("#result-page").show();
+                            $("#time-taken").text("Time Taken: " + timeTaken + " seconds");
+                            $("#inter-key-intervals").text("Inter Key Stroke Intervals: " + interKeyIntervals.join(", "));
+                            $("#errors").text("Errors: " + errors);
+
+                            downloadResults();
+                        }
+                    } else {
+                        errors++;
+                        userSequence.pop(); // Remove the incorrect number from the user sequence
+                    }
+
+                    if (userSequence.length > 1) {
+                        var currentTime = new Date();
+                        var interval = currentTime - startTime;
+                        interKeyIntervals.push(interval / 1000);
+                    }
+                }
+            });
+        }
+
+        function downloadResults() {
+  var userName = $("#user-name").val();
+  var results = "User Name: " + userName + "\n";
+  results += "Grid Size: " + gridSize + "x" + gridSize + "\n";
+  results += "Number Type: " + numberType + "\n";
+  results += "Task Type: " + taskType + "\n";
+  results += "Color Correct Keys: " + (colorCorrectKeys ? "Yes" : "No") + "\n";
+  results += "Time Taken: " + ($("#time-taken").text().split(":")[1]).trim() + "\n";
+  results += "Inter Key Stroke Intervals: " + ($("#inter-key-intervals").text().split(":")[1]).trim() + "\n";
+  results += "Errors: " + ($("#errors").text().split(":")[1]).trim() + "\n";
+
+  var element = document.createElement("a");
+  element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(results));
+  element.setAttribute("download", userName + "_results.txt"); // Dynamically generate the filename
+  element.style.display = "none";
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}
+
+
+        function resetModule() {
+  // Reset variables
+  gridSize = null;
+  numberType = null;
+  taskType = null;
+  colorCorrectKeys = false;
+  numbers = [];
+  correctSequence = [];
+  userSequence = [];
+  startTime = null;
+  interKeyIntervals = [];
+  errors = 0;
+  completed = false;
+
+  // Reset element values
+  $("#grid-size").val("3");
+  $("#number-type").val("natural");
+  $("#custom-start").val("1");
+  $("#custom-step").val("3");
+  $("#task-type").val("ascending");
+  $("#color-correct-keys").prop("checked", false);
+  $("#user-name").val("");
+
+  // Reload the page
+  location.reload();
+}
+
+    </script>
+</body>
+</html>
