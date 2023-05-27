@@ -73,6 +73,7 @@
             <option value="ascending">Ascending Order</option>
             <option value="descending">Descending Order</option>
             <option value="multivariate">Multivariate Order</option>
+            <option value="inverse-multivariate">Inverse-multivariate Order</option>
         </select>
         <br><br>
         <label for="color-correct-keys">Color Correct Keys:</label>
@@ -149,71 +150,122 @@
         }
 
         function generateCorrectSequence() {
-            if (taskType === "ascending") {
-                correctSequence = numbers.slice().sort(function(a, b) { return a - b; });
-            } else if (taskType === "descending") {
-                correctSequence = numbers.slice().sort(function(a, b) { return b - a; });
-            } else if (taskType === "multivariate") {
-                correctSequence = numbers.slice();
-            }
+    if (taskType === "ascending") {
+        correctSequence = numbers.slice().sort(function(a, b) { return a - b; });
+    } else if (taskType === "descending") {
+        correctSequence = numbers.slice().sort(function(a, b) { return b - a; });
+    } else if (taskType === "multivariate") {
+        var sortedNumbers = numbers.slice().sort(function(a, b) { return a - b; });
+        var minIndex = 0;
+        var maxIndex = sortedNumbers.length - 1;
+
+        // Add numbers to the correctSequence in divergent order
+        while (minIndex < maxIndex) {
+            correctSequence.push(sortedNumbers[minIndex]);
+            correctSequence.push(sortedNumbers[maxIndex]);
+            minIndex++;
+            maxIndex--;
         }
 
-        function displayTaskPage() {
-            $("#options-page").hide();
-            $("#task-page").show();
+        // Add the last number only once if there's a middle number
+        if (minIndex === maxIndex) {
+            correctSequence.push(sortedNumbers[minIndex]);
+        }
+    } else if (taskType === "inverse-multivariate") {
+        var sortedNumbers = numbers.slice().sort(function(a, b) { return a - b; });
+        var middleIndex1 = Math.floor((sortedNumbers.length - 1) / 2);
+        var middleIndex2 = middleIndex1 + 1;
 
-            var gridTable = $("#grid");
-            gridTable.empty();
+        // Add numbers to the correctSequence in inverse divergent order
+        while (middleIndex1 >= 0 && middleIndex2 < sortedNumbers.length) {
+            correctSequence.push(sortedNumbers[middleIndex1]);
+            correctSequence.push(sortedNumbers[middleIndex2]);
+            middleIndex1--;
+            middleIndex2++;
+        }
 
-            var cellSize = Math.min(200, Math.floor(window.innerHeight / gridSize) - 10);
+        // Add the last number only once if it exists
+        if (middleIndex1 === 0) {
+            correctSequence.push(sortedNumbers[middleIndex1]);
+        }
+    }
+}
 
-            for (var i = 0; i < gridSize; i++) {
-                var row = $("<tr></tr>");
-                for (var j = 0; j < gridSize; j++) {
-                    var cell = $("<td></td>").text(numbers[i * gridSize + j]).css("width", cellSize + "px").css("height", cellSize + "px");
-                    row.append(cell);
+// Find the index of a specific number in the shuffled grid
+function findNumberIndex(arr, num) {
+    for (var i = 0; i < arr.length; i++) {
+        if (arr[i] === num) {
+            return i;
+        }
+    }
+    return -1; // Number not found
+}
+
+
+
+
+function displayTaskPage() {
+    $("#options-page").hide();
+    $("#task-page").show();
+
+    var gridTable = $("#grid");
+    gridTable.empty();
+
+    var cellSize = Math.min(200, Math.floor(window.innerHeight / gridSize) - 10);
+
+    for (var i = 0; i < gridSize; i++) {
+        var row = $("<tr></tr>");
+        for (var j = 0; j < gridSize; j++) {
+            var cell = $("<td></td>").text(numbers[i * gridSize + j]).css("width", cellSize + "px").css("height", cellSize + "px");
+            row.append(cell);
+        }
+        gridTable.append(row);
+    }
+
+    startTime = new Date();
+
+    $("#grid").on("click", "td", function() {
+        if (!completed) {
+            var selectedNumber = parseInt($(this).text());
+            userSequence.push(selectedNumber);
+
+            if (selectedNumber === correctSequence[userSequence.length - 1]) {
+                if (colorCorrectKeys) {
+                    var $cell = $(this);
+                    $cell.css("background-color", "green");
+                    setTimeout(function() {
+                        $cell.css("background-color", ""); // Remove the color highlight after 1 second
+                    }, 50);
                 }
-                gridTable.append(row);
+
+                if (userSequence.length === correctSequence.length) {
+                    completed = true;
+                    var endTime = new Date();
+                    var timeTaken = (endTime - startTime) / 1000;
+
+                    $("#task-page").hide();
+                    $("#result-page").show();
+                    $("#time-taken").text("Time Taken: " + timeTaken + " seconds");
+                    $("#inter-key-intervals").text("Inter Key Stroke Intervals: " + interKeyIntervals.join(", "));
+                    $("#errors").text("Errors: " + errors);
+
+                    downloadResults();
+                }
+            } else {
+                errors++;
+                userSequence.pop(); // Remove the incorrect number from the user sequence
             }
 
-            startTime = new Date();
-
-            $("#grid").on("click", "td", function() {
-                if (!completed) {
-                    var selectedNumber = parseInt($(this).text());
-                    userSequence.push(selectedNumber);
-
-                    if (selectedNumber === correctSequence[userSequence.length - 1]) {
-                        if (colorCorrectKeys) {
-                            $(this).css("background-color", "green");
-                        }
-
-                        if (userSequence.length === correctSequence.length) {
-                            completed = true;
-                            var endTime = new Date();
-                            var timeTaken = (endTime - startTime) / 1000;
-
-                            $("#task-page").hide();
-                            $("#result-page").show();
-                            $("#time-taken").text("Time Taken: " + timeTaken + " seconds");
-                            $("#inter-key-intervals").text("Inter Key Stroke Intervals: " + interKeyIntervals.join(", "));
-                            $("#errors").text("Errors: " + errors);
-
-                            downloadResults();
-                        }
-                    } else {
-                        errors++;
-                        userSequence.pop(); // Remove the incorrect number from the user sequence
-                    }
-
-                    if (userSequence.length > 1) {
-                        var currentTime = new Date();
-                        var interval = currentTime - startTime;
-                        interKeyIntervals.push(interval / 1000);
-                    }
-                }
-            });
+            if (userSequence.length > 1) {
+                var currentTime = new Date();
+                var interval = currentTime - startTime;
+                interKeyIntervals.push(interval / 1000);
+            }
         }
+    });
+}
+
+
 
         function downloadResults() {
   var userName = $("#user-name").val();
